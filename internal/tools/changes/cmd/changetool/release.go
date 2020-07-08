@@ -1,22 +1,52 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/internal/tools/changes"
+	"os"
 )
+
+var updatePendingFlags *flag.FlagSet
+
+func releaseUsage() {
+	var sets = []*flag.FlagSet{updatePendingFlags}
+
+	for _, f := range sets {
+		f.Usage()
+	}
+}
+
+func init() {
+	updatePendingFlags = flag.NewFlagSet("update-pending", flag.ExitOnError)
+	updatePendingFlags.Usage = func() {
+		fmt.Printf("%s release update-pending <repo>\n  <repo>: path to git repository\n", os.Args[0])
+		updatePendingFlags.PrintDefaults()
+	}
+}
 
 func releaseSubcmd(args []string) error {
 	if len(args) < 2 {
-		usage()
+		releaseUsage()
+		return errors.New("invalid usage")
 	}
 
-	repo, err := changes.NewRepository(args[0])
+	subCmd := args[0]
+	repoPath := args[1]
+
+	repo, err := changes.NewRepository(repoPath)
 	if err != nil {
 		return fmt.Errorf("couldn't load repository: %v", err)
 	}
 
-	switch args[1] {
+	switch subCmd {
 	case "update-pending":
+		err = updatePendingFlags.Parse(args[1:])
+		if err != nil {
+			return err
+		}
+
 		return updatePendingCmd(repo)
 	case "versions-init":
 		return repo.InitializeVersions()
@@ -32,20 +62,19 @@ func releaseSubcmd(args []string) error {
 			},
 		}, false)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		return repo.UpdateChangelog(release, false)
 	case "test":
 		enclosure, _ := repo.DiscoverVersions(changes.ReleaseVersionSelector)
 		repo.Metadata.SaveEnclosure(enclosure)
-	case "scratch":
 
+		return nil
 	default:
-		usage()
+		releaseUsage()
+		return errors.New("invalid usage")
 	}
-
-	return nil
 }
 
 func updatePendingCmd(repo *changes.Repository) error {

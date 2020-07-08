@@ -2,6 +2,7 @@ package changes
 
 import (
 	"encoding/json"
+	"github.com/google/go-cmp/cmp"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,8 +15,8 @@ func TestNewRepository(t *testing.T) {
 		t.Error(err)
 	}
 
-	if repo.Metadata.ChangePath != "testdata/.changes" {
-		t.Errorf("expected Metadata.ChangePath to be testdata/.changes, got %s", repo.Metadata.ChangePath)
+	if repo.Metadata.ChangePath != filepath.Join("testdata", metadataDir) {
+		t.Errorf("expected Metadata.ChangePath to be %s, got %s", filepath.Join("testdata", metadataDir), repo.Metadata.ChangePath)
 	}
 }
 
@@ -26,10 +27,10 @@ func TestRepository_UpdateChangelog(t *testing.T) {
 		cases := getTestChangelogCases(t, changelogType)
 		for _, tt := range cases {
 			pending := false
-			fileName := "testdata/CHANGELOG.md"
+			fileName := filepath.Join("testdata", "CHANGELOG.md")
 			if changelogType == "pending" {
 				pending = true
-				fileName = "testdata/CHANGELOG_PENDING.md"
+				fileName = filepath.Join("testdata", "CHANGELOG_PENDING.md")
 			}
 
 			t.Run(tt.release.ID+"_"+changelogType, func(t *testing.T) {
@@ -43,8 +44,8 @@ func TestRepository_UpdateChangelog(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if string(changelog) != tt.changelog {
-					t.Errorf("expected changelog \"%s\", got \"%s\"", tt.changelog, string(changelog))
+				if diff := cmp.Diff(string(changelog), tt.changelog); diff != "" {
+					t.Errorf("expect changelogs to match:\n%v", diff)
 				}
 
 				err = os.Remove(fileName)
@@ -70,16 +71,18 @@ type changelogCase struct {
 
 func getTestChangelogCases(t *testing.T, changelogType string) []changelogCase {
 	t.Helper()
+	const releasesTestDir = "releases"
+	const changelogsTestDir = "changelogs"
 
 	var cases []changelogCase
 
-	files, err := ioutil.ReadDir("testdata/releases")
+	files, err := ioutil.ReadDir(filepath.Join("testdata", releasesTestDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, f := range files {
-		releaseData, err := ioutil.ReadFile(filepath.Join("testdata", "releases", f.Name()))
+		releaseData, err := ioutil.ReadFile(filepath.Join("testdata", releasesTestDir, f.Name()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +93,7 @@ func getTestChangelogCases(t *testing.T, changelogType string) []changelogCase {
 			t.Fatal(err)
 		}
 
-		changelog, err := ioutil.ReadFile(filepath.Join("testdata", "changelogs", changelogType, release.ID+".md"))
+		changelog, err := ioutil.ReadFile(filepath.Join("testdata", changelogsTestDir, changelogType, release.ID+".md"))
 		if err != nil {
 			t.Fatal(err)
 		}

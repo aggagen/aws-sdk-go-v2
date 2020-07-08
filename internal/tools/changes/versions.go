@@ -26,7 +26,7 @@ type Version struct {
 
 // VersionEnclosure is a set of versions for Go modules in a given repository.
 type VersionEnclosure struct {
-	SchemaVersion  string             // SchemaVersion is the version of the library's types used to create this VersionEnclosure
+	SchemaVersion  int                // SchemaVersion is the version of the library's types used to create this VersionEnclosure
 	ModuleVersions map[string]Version // ModuleVersions is a mapping between full module paths and their corresponding Version.
 	Packages       map[string]string  // Packages maps each package in the repo to the module that provides the package.
 }

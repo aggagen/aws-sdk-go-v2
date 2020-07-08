@@ -1,8 +1,10 @@
 package changes
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
+	"text/template"
 )
 
 // VersionBump describes a version increment to a module.
@@ -14,41 +16,63 @@ type VersionBump struct {
 // Release represents a single SDK release, which contains all change metadata and their resulting version bumps.
 type Release struct {
 	ID            string
-	SchemaVersion string
+	SchemaVersion int
 	VersionBumps  map[string]VersionBump
-	Changes       []*Change
+	Changes       []Change
+}
+
+type changelogModuleEntry struct {
+	Prefix   string
+	Module   string
+	Version  string
+	Sections map[ChangeType][]Change
+}
+
+const changelogModule = `{{.Prefix}}# ` + "`" + `{{.Module}}` + "`" + `{{with .Version}} - {{.}}{{end}}
+{{range $key, $section := .Sections}}{{$.Prefix}}## {{ $key.HeaderTitle }}
+{{range $section}}* {{.Description}}
+{{end}}
+{{end}}`
+
+var changelogTemplate *template.Template
+
+func init() {
+	var err error
+
+	changelogTemplate, err = template.New("changelog-entry").Parse(changelogModule)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // RenderChangelogForModule returns a new markdown section of a module's CHANGELOG based on the Changes in the Release.
-func (r *Release) RenderChangelogForModule(module, headerPrefix string) string {
-	sections := map[string]string{}
-	var sectionsList []string
+func (r *Release) RenderChangelogForModule(module, headerPrefix string) (string, error) {
+	sections := map[ChangeType][]Change{}
 
 	for _, c := range r.Changes {
 		if c.Module == module {
-			if _, ok := sections[c.Type]; !ok {
-				sectionsList = append(sectionsList, c.Type)
-			}
-
-			sections[c.Type] += fmt.Sprintf("* %s\n", c.Description)
+			sections[c.Type] = append(sections[c.Type], c)
 		}
 	}
 
-	entry := fmt.Sprintf("%s# `%s`", headerPrefix, module)
+	var version string
 	if bump, ok := r.VersionBumps[module]; ok {
-		entry += " - " + bump.To + "\n"
-	} else {
-		entry += "\n"
+		version = bump.To
 	}
 
-	sort.Strings(sectionsList)
+	buff := new(bytes.Buffer)
 
-	for _, section := range sectionsList {
-		entry += headerPrefix + "## " + changeHeaders[section] + "\n"
-		entry += sections[section] + "\n"
+	err := changelogTemplate.Execute(buff, changelogModuleEntry{
+		Prefix:   headerPrefix,
+		Module:   module,
+		Version:  version,
+		Sections: sections,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to render module %s's changelog entry: %v", module, err)
 	}
 
-	return entry
+	return buff.String(), nil
 }
 
 // AffectedModules returns a sorted list of all modules affected by this Release. A module is considered affected if
