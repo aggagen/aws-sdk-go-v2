@@ -8,13 +8,20 @@ import (
 	"time"
 )
 
-const FeatureType = "feature" // FeatureType is a constant change type for a new feature.
-const BugFixType = "bugfix"   // BugFixType is a constant change type for a bug fix.
+const (
+	FeatureType = "feature" // FeatureType is a constant change type for a new feature.
+	BugFixType = "bugfix"   // BugFixType is a constant change type for a bug fix.
+)
 
 // changeTypes maps valid Change Types to the header they are grouped under in CHANGELOGs.
 var changeHeaders = map[string]string{
 	FeatureType: "New Features",
 	BugFixType:  "Bug Fixes",
+}
+
+var changeBumps = map[string]VersionIncrement{
+	BugFixType:  PatchBump,
+	FeatureType: MinorBump,
 }
 
 const changeTemplateSuffix = `
@@ -51,6 +58,8 @@ func NewChanges(modules []string, changeType, description string) ([]*Change, er
 	changes := make([]*Change, 0, len(modules))
 
 	for _, module := range modules {
+		module = shortenModPath(module)
+
 		changes = append(changes, &Change{
 			ID:          generateId(module, changeType),
 			Module:      module,

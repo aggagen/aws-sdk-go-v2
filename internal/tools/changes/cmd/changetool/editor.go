@@ -14,7 +14,7 @@ func editTemplate(template []byte) ([]byte, error) {
 		editor = "vim"
 	}
 
-	f, err := ioutil.TempFile(".", "tmp-template-entry")
+	f, err := ioutil.TempFile("", "tmp-changes-template-entry")
 	if err != nil {
 		return nil, err
 	}

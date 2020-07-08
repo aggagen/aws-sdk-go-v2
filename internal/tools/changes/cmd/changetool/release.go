@@ -18,6 +18,8 @@ func releaseSubcmd(args []string) error {
 	switch args[1] {
 	case "update-pending":
 		return updatePendingCmd(repo)
+	case "versions-init":
+		return repo.InitializeVersions()
 	case "demo-release":
 		release, err := repo.Metadata.CreateRelease("2020-06-26", map[string]changes.VersionBump{
 			"changes": {
@@ -34,6 +36,11 @@ func releaseSubcmd(args []string) error {
 		}
 
 		return repo.UpdateChangelog(release, false)
+	case "test":
+		enclosure, _ := repo.DiscoverVersions(changes.ReleaseVersionSelector)
+		repo.Metadata.SaveEnclosure(enclosure)
+	case "scratch":
+
 	default:
 		usage()
 	}

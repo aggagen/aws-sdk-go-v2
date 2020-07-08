@@ -15,9 +15,10 @@ const SchemaVersion = "1.0"
 
 // Metadata is a representation of the change metadata stored in a .changes directory.
 type Metadata struct {
-	ChangePath string     // ChangePath is the relative path from the current directory to .changes
-	Changes    []*Change  // Changes holds all pending change metadata in the .changes/next-release directory
-	Releases   []*Release // Releases contains all releases in the .changes/releases directory
+	ChangePath      string           // ChangePath is the relative path from the current directory to .changes
+	Changes         []*Change        // Changes holds all pending change metadata in the .changes/next-release directory
+	Releases        []*Release       // Releases contains all releases in the .changes/releases directory
+	CurrentVersions VersionEnclosure // CurrentVersions is the .changes/versions.json enclosure of current module versions
 }
 
 // LoadMetadata loads the .changes directory at the given path.
@@ -27,9 +28,15 @@ func LoadMetadata(path string) (*Metadata, error) {
 		return nil, err
 	}
 
+	v, err := loadVersions(filepath.Join(path, "versions.json"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &Metadata{
-		ChangePath: path,
-		Changes:    changes,
+		ChangePath:      path,
+		Changes:         changes,
+		CurrentVersions: v,
 	}, nil
 }
 
@@ -190,6 +197,16 @@ func (m *Metadata) deleteChangeFile(id string) error {
 	return os.Remove(filepath.Join(m.ChangePath, "next-release", id+".json"))
 }
 
+func (m *Metadata) SaveEnclosure(enc VersionEnclosure) error {
+	err := writeJSON(enc, m.ChangePath, "", "versions")
+	if err != nil {
+		return err
+	}
+
+	m.CurrentVersions = enc
+	return nil
+}
+
 // GetChangesPath searches upward from the current directory for a .changes directory, returning a relative path from
 // the current directory to the .changes directory.
 func GetChangesPath() (string, error) {
@@ -232,4 +249,21 @@ func loadChanges(changesDir string) ([]*Change, error) {
 	})
 
 	return changes, nil
+}
+
+func loadVersions(path string) (VersionEnclosure, error) {
+	versionsData, err := ioutil.ReadFile(path)
+	if err != nil {
+		return VersionEnclosure{}, fmt.Errorf("couldn't load version enclosure at %s: %v", path, err)
+	}
+
+	var enclosure VersionEnclosure
+	err = json.Unmarshal(versionsData, &enclosure)
+	if err != nil {
+		return VersionEnclosure{}, fmt.Errorf("couldn't load version enclosure at %s: %v", path, err)
+	}
+
+	// TODO: perform check against git tags, error if inconsistent
+
+	return enclosure, nil
 }
