@@ -41,6 +41,18 @@ func (c ChangeType) HeaderTitle() string {
 	}
 }
 
+// VersionIncrement returns the VersionIncrement corresponding to the given ChangeType.
+func (c ChangeType) VersionIncrement() VersionIncrement {
+	switch c {
+	case FeatureChangeType:
+		return MinorBump
+	case BugFixChangeType:
+		return PatchBump
+	default:
+		panic("unknown change type: " + string(c))
+	}
+}
+
 // String returns a string representation of the ChangeType
 func (c ChangeType) String() string {
 	return string(c)
@@ -82,11 +94,6 @@ func (c *ChangeType) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	*c, err = ParseChangeType(s)
 	return err
-}
-
-var changeBumps = map[ChangeType]VersionIncrement{
-	BugFixChangeType:  PatchBump,
-	FeatureChangeType: MinorBump,
 }
 
 const changeTemplateSuffix = `
