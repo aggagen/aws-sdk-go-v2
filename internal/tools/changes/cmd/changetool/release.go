@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -8,10 +9,16 @@ import (
 	"os"
 )
 
+var releaseParams = struct {
+	repo     string
+	selector changes.VersionSelector
+}{}
+
 var updatePendingFlags *flag.FlagSet
+var staticVersionsFlags *flag.FlagSet
 
 func releaseUsage() {
-	var sets = []*flag.FlagSet{updatePendingFlags}
+	var sets = []*flag.FlagSet{updatePendingFlags, staticVersionsFlags}
 
 	for _, f := range sets {
 		f.Usage()
@@ -20,9 +27,18 @@ func releaseUsage() {
 
 func init() {
 	updatePendingFlags = flag.NewFlagSet("update-pending", flag.ExitOnError)
+	updatePendingFlags.StringVar(&releaseParams.repo, "repo", "", "path to the SDK git repository")
 	updatePendingFlags.Usage = func() {
-		fmt.Printf("%s release update-pending <repo>\n  <repo>: path to git repository\n", os.Args[0])
+		fmt.Printf("%s release update-pending <repo>\n", os.Args[0])
 		updatePendingFlags.PrintDefaults()
+	}
+
+	staticVersionsFlags = flag.NewFlagSet("static-versions", flag.ExitOnError)
+	staticVersionsFlags.StringVar(&releaseParams.repo, "repo", "", "path to the SDK git repository")
+	staticVersionsFlags.Var(&releaseParams.selector, "selector", "sets versioning strategy: release, development, or tags")
+	staticVersionsFlags.Usage = func() {
+		fmt.Printf("%s release static-versions\n", os.Args[0])
+		staticVersionsFlags.PrintDefaults()
 	}
 }
 
@@ -33,44 +49,27 @@ func releaseSubcmd(args []string) error {
 	}
 
 	subCmd := args[0]
-	repoPath := args[1]
-
-	repo, err := changes.NewRepository(repoPath)
-	if err != nil {
-		return fmt.Errorf("couldn't load repository: %v", err)
-	}
 
 	switch subCmd {
 	case "update-pending":
-		err = updatePendingFlags.Parse(args[1:])
+		err := updatePendingFlags.Parse(args[1:])
 		if err != nil {
 			return err
+		}
+
+		repo, err := changes.NewRepository(releaseParams.repo)
+		if err != nil {
+			return fmt.Errorf("couldn't load repository: %v", err)
 		}
 
 		return updatePendingCmd(repo)
-	case "versions-init":
-		return repo.InitializeVersions()
-	case "demo-release":
-		release, err := repo.Metadata.CreateRelease("2020-06-26", map[string]changes.VersionBump{
-			"changes": {
-				From: "v1.0.0",
-				To:   "v1.0.1",
-			},
-			"test": {
-				From: "v1.2.3",
-				To:   "v1.3.0",
-			},
-		}, false)
+	case "static-versions":
+		err := staticVersionsFlags.Parse(args[1:])
 		if err != nil {
 			return err
 		}
 
-		return repo.UpdateChangelog(release, false)
-	case "test":
-		enclosure, _ := repo.DiscoverVersions(changes.ReleaseVersionSelector)
-		repo.Metadata.SaveEnclosure(enclosure)
-
-		return nil
+		return staticVersionsCmd()
 	default:
 		releaseUsage()
 		return errors.New("invalid usage")
@@ -84,5 +83,25 @@ func updatePendingCmd(repo *changes.Repository) error {
 	}
 
 	fmt.Println("successfully updated CHANGELOG_PENDING")
+	return nil
+}
+
+func staticVersionsCmd() error {
+	repo, err := changes.NewRepository(releaseParams.repo)
+	if err != nil {
+		return fmt.Errorf("couldn't load repository: %v", err)
+	}
+
+	enclosure, err := repo.DiscoverVersions(releaseParams.selector)
+	if err != nil {
+		return err
+	}
+
+	out, err := json.Marshal(enclosure)
+	if err != nil {
+		return err
+	}
+
+	fmt.Print(string(out))
 	return nil
 }
