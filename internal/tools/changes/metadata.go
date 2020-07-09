@@ -16,6 +16,7 @@ const SchemaVersion = 1
 const metadataDir = ".changes"
 const pendingDir = "next-release"
 const releaseDir = "releases"
+const versionsFile = "versions.json"
 
 // Metadata is a representation of the change metadata stored in a .changes directory.
 type Metadata struct {
@@ -32,7 +33,7 @@ func LoadMetadata(path string) (*Metadata, error) {
 		return nil, err
 	}
 
-	v, err := loadVersions(filepath.Join(path, "versions.json"))
+	v, err := loadVersions(filepath.Join(path, versionsFile))
 	if err != nil {
 		return nil, err
 	}
