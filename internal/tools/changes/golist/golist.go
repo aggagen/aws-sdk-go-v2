@@ -79,19 +79,6 @@ func (c Client) parseGoModuleList(output []byte) ([]string, error) {
 }
 
 // Packages returns a slice of packages that are part of the module mod.
-func (c Client) Packages2(mod string) ([]string, error) {
-	mod = c.ShortenModPath(mod)
-
-	cmd := exec.Command("go", "list", "-json", "-mod", "readonly", "./...")
-	out, err := util.ExecAt(cmd, c.path(mod))
-	if err != nil {
-		return nil, fmt.Errorf("failed to list packages: %v", err)
-	}
-
-	return parseGoList(out)
-}
-
-// Packages returns a slice of packages that are part of the module mod.
 func (c Client) Packages(mod string) ([]string, error) {
 	mod = c.ShortenModPath(mod)
 
@@ -130,9 +117,10 @@ func (c Client) Packages(mod string) ([]string, error) {
 			return err
 		}
 
-		path = strings.TrimPrefix(path, absRoot+"/")
-
+		path = strings.TrimPrefix(path, absRoot)
+		path = strings.TrimLeft(path, "/")
 		parts := strings.Split(filepath.ToSlash(path), "/")
+
 		p := c.LengthenModPath(strings.Join(parts, "/"))
 
 		packages[p] = struct{}{}
@@ -174,6 +162,7 @@ func parseGoList(output []byte) ([]string, error) {
 	return packages, nil
 }
 
+// Checksum returns the given module's Go checksum at the specified version.
 func (c Client) Checksum(mod, version string) (string, error) {
 	mod = c.ShortenModPath(mod)
 
@@ -195,6 +184,7 @@ func (c Client) Checksum(mod, version string) (string, error) {
 	return dirhash.HashZip(tmpfile.Name(), dirhash.DefaultHash)
 }
 
+// Tidy runs go mod tidy on the specified module.
 func (c Client) Tidy(mod string) error {
 	cmd := exec.Command("go", "mod", "tidy")
 	_, err := util.ExecAt(cmd, c.path(mod))

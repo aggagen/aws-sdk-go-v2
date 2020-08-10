@@ -8,8 +8,6 @@ import (
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
-	"golang.org/x/mod/sumdb/dirhash"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -50,15 +48,17 @@ func shortenModPath(modulePath string) string {
 		return rootModule
 	}
 
+	modulePath = strings.TrimPrefix(modulePath, "./")
 	modulePath = strings.TrimLeft(modulePath, "/")
 	return strings.TrimPrefix(modulePath, sdkRepo+"/")
 }
 
 func lengthenModPath(modulePath string) string {
-	if modulePath == rootModule {
+	if modulePath == rootModule || modulePath == "" {
 		return sdkRepo
 	}
 
+	modulePath = strings.TrimLeft(modulePath, "/")
 	return sdkRepo + "/" + modulePath
 }
 
@@ -194,15 +194,4 @@ func formatPseudoVersion(commitHash, taggedVersion string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s-0.%s", taggedVersion, commitHash), nil
-}
-
-func GoModChecksum(repopath, mod string) {
-	hash, err := dirhash.Hash1([]string{filepath.Join(repopath, mod, "go.mod")}, func(name string) (io.ReadCloser, error) {
-		return os.Open(name)
-	})
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Println(hash)
 }

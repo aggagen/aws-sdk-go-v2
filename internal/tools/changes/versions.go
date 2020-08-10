@@ -100,6 +100,8 @@ func (v *VersionEnclosure) updateHashes(hashes map[string]string) error {
 	return nil
 }
 
+// HashDiff returns all modules whose hash provided in hashes differs from the has present in VersionEnclosure v. hashes
+// is a map between shortened module names and their Go checksum.
 func (v *VersionEnclosure) HashDiff(hashes map[string]string) []string {
 	var diff []string
 

@@ -18,7 +18,6 @@ var changeParams = struct {
 	description string
 	compareTo   string
 	similar     bool
-	wildcard    bool
 }{}
 
 var addFlags *flag.FlagSet
@@ -39,7 +38,6 @@ func init() {
 	addFlags.StringVar(&changeParams.module, "module", "", "sets the change's module")
 	addFlags.Var(&changeParams.changeType, "type", "sets the change's type")
 	addFlags.StringVar(&changeParams.description, "description", "", "sets the change's description")
-	addFlags.BoolVar(&changeParams.wildcard, "wildcard", false, "allows for the entry of a wildcard change (e.g. services/*")
 	addFlags.StringVar(&changeParams.compareTo, "compare-to", "", "specifies a path to a version enclosure to compare current module hashes to in order to resolve a wildcard.")
 	addFlags.Usage = func() {
 		fmt.Printf("%s change add [-module=<module>] [-type=<type>] [-description=<description>]\n", os.Args[0])
@@ -91,7 +89,7 @@ func changeSubcmd(args []string) error {
 			return err
 		}
 
-		if changeParams.wildcard {
+		if changes.ModIsWildcard(changeParams.module) {
 			return addCmdWildcard(metadata, changeParams.module, changeParams.changeType, changeParams.description, changeParams.compareTo)
 		}
 

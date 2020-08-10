@@ -14,9 +14,10 @@ type Repository struct {
 	RootPath string    // RootPath is the path to the root of the repository.
 	Metadata *Metadata // Metadata is the repository's .changes metadata.
 
+	// Logf is a logging function. If nil, Repository will not log anything.
 	Logf func(string, ...interface{})
 
-	modules []string // modules contains the shortened module path of all modules in the repository. modules is lazily loaded by Modules()
+	modules []string // modules contains the shortened module path of all modules in the repository. modules is lazily loaded by Modules().
 
 	git    git.VcsClient
 	golist golist.ModuleClient
@@ -71,46 +72,34 @@ func (r *Repository) DoRelease(releaseID string) error {
 
 	enc, bumps, err := r.DiscoverVersions(ReleaseVersionSelector)
 	if err != nil {
-		return fmt.Errorf("couldn't do release: %v", err)
+		return fmt.Errorf("couldn't discover versions for release: %v", err)
 	}
 
 	err = r.resolveDependencies(&enc, bumps) // update all dependencies on SDK modules to their latest versions.
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve dependencies: %v", err)
 	}
 
 	rel, err := r.Metadata.CreateRelease(releaseID, bumps, false)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create release metadata: %v", err)
 	}
 
 	err = r.UpdateAllChangelogs(rel, false)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update changelogs: %v", err)
 	}
 
-	err = r.UpdateVersionFiles(enc)
+	err = r.updateVersionFiles(enc)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update version files: %v", err)
 	}
 
-	hashes, err := r.ModuleHashes(enc)
+	err = r.tagAndPush(releaseID, bumps)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to tag and push to repo: %v", err)
 	}
-
-	// update hashes after modifying module contents (e.g. CHANGELOG and go.mod files)
-	err = enc.updateHashes(hashes)
-	if err != nil {
-		return err
-	}
-
-	err = r.Metadata.SaveEnclosure(enc)
-	if err != nil {
-		return err
-	}
-
-	return r.tagAndPush(releaseID, bumps)
+	return nil
 }
 
 func (r *Repository) tagAndPush(releaseID string, bumps map[string]VersionBump) error {
@@ -295,6 +284,10 @@ func (r *Repository) discoverVersions(modules []string, selector VersionSelector
 	return enclosure, bumps, nil
 }
 
+// ModuleHashes computes and returns a mapping between shortened module names and their corresponding Go module checksum.
+// Since the version of a module is used to compute the Go checksum (i.e. two modules with the same directory contents
+// have a different checksum if their versions are different), the versions of the given VersionEnclosure will be used
+// for this purpose.
 func (r *Repository) ModuleHashes(enc VersionEnclosure) (map[string]string, error) {
 	modules, err := r.Modules()
 	if err != nil {
@@ -315,6 +308,28 @@ func (r *Repository) ModuleHashes(enc VersionEnclosure) (map[string]string, erro
 	return hashes, nil
 }
 
+// updateVersionFiles updates versions.json and all existing version.go files using the given VersionEnclosure.
+func (r *Repository) updateVersionFiles(enc VersionEnclosure) error {
+	err := r.UpdateVersionFiles(enc)
+	if err != nil {
+		return err
+	}
+
+	hashes, err := r.ModuleHashes(enc)
+	if err != nil {
+		return err
+	}
+
+	// update hashes after modifying module contents (e.g. version.go, CHANGELOG.md, and go.mod files)
+	err = enc.updateHashes(hashes)
+	if err != nil {
+		return err
+	}
+
+	return r.Metadata.SaveEnclosure(enc)
+}
+
+// Tidy runs go mod tidy on all modules in the repository.
 func (r *Repository) Tidy() error {
 	modules, err := r.Modules()
 	if err != nil {
@@ -331,6 +346,8 @@ func (r *Repository) Tidy() error {
 	return nil
 }
 
+// UpdateVersionFiles updates the version.go file with the version present in the VersionEnclosure enc. If version.go
+// does not exist for a module, UpdateVersionFiles does not create one.
 func (r *Repository) UpdateVersionFiles(enc VersionEnclosure) error {
 	const versionGoFile = "version.go"
 	const prefix = "const ModuleVersion = "

@@ -89,10 +89,12 @@ func FindFile(fileName string, dir bool) (string, error) {
 	}
 }
 
+// ReplaceLine replaces any line in the file at the given path that begins with linePrefix with the given replacement
+// string.
 func ReplaceLine(path, linePrefix, replacement string) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("couldn't replace file's line: %v")
+		return fmt.Errorf("couldn't replace file's line: %v", err)
 	}
 
 	lines := strings.Split(string(data), "\n")
