@@ -150,7 +150,7 @@ func defaultVersion(mod string) (string, error) {
 	major = strings.TrimLeft(major, "/")
 
 	if major == "" {
-		major = "v0"
+		return "v0.1.0", nil
 	}
 
 	return fmt.Sprintf("%s.0.0", major), nil
