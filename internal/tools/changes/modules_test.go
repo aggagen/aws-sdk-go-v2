@@ -38,7 +38,7 @@ func TestDiscoverModules(t *testing.T) {
 		},
 	}
 
-	mods, _, err := discoverModules(goclient, filepath.Join("testdata", "modules"))
+	mods, err := discoverModules(goclient.RootPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,4 +170,12 @@ func (c *mockGolist) Dependencies(mod string) ([]string, error) {
 
 func (c *mockGolist) Packages(mod string) ([]string, error) {
 	return c.packages[mod], nil
+}
+
+func (c *mockGolist) Checksum(mod, version string) (string, error) {
+	return "01234567abcdef", nil
+}
+
+func (c *mockGolist) Tidy(mod string) error {
+	return nil
 }

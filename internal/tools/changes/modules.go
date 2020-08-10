@@ -9,7 +9,7 @@ import (
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 	"golang.org/x/mod/sumdb/dirhash"
-	"golang.org/x/mod/zip"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -62,10 +62,15 @@ func lengthenModPath(modulePath string) string {
 	return sdkRepo + "/" + modulePath
 }
 
-// discoverModules returns a list of all modules and a map between all packages and their providing module.
-func discoverModules(golist golist.ModuleClient, root string) ([]string, map[string]string, error) {
+func modToPath(mod string) string {
+	parts := strings.Split(mod, "/")
+
+	return filepath.Join(parts...)
+}
+
+// discoverModules returns a list of all modules within the provided root directory.
+func discoverModules(root string) ([]string, error) {
 	var modules []string
-	packages := map[string]string{}
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -79,16 +84,6 @@ func discoverModules(golist golist.ModuleClient, root string) ([]string, map[str
 			}
 
 			mod := shortenModPath(modFile.Module.Mod.String())
-
-			modPackages, err := golist.Packages(mod)
-			if err != nil {
-				return err
-			}
-
-			for _, p := range modPackages {
-				packages[p] = mod
-			}
-
 			modules = append(modules, mod)
 		} else if info.Name() == "testdata" && path != "testdata" {
 			// skip testdata directory unless it is the root directory.
@@ -98,10 +93,28 @@ func discoverModules(golist golist.ModuleClient, root string) ([]string, map[str
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return modules, packages, nil
+	return modules, nil
+}
+
+// packages returns a mapping between each package in the repository and its providing module.
+func packages(golist golist.ModuleClient, modules []string) (map[string]string, error) {
+	packages := map[string]string{}
+
+	for _, mod := range modules {
+		modPackages, err := golist.Packages(mod)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range modPackages {
+			packages[p] = mod
+		}
+	}
+
+	return packages, nil
 }
 
 func updateDependencies(repoPath, mod string, dependencies []string, enc *VersionEnclosure) error {
@@ -183,21 +196,13 @@ func formatPseudoVersion(commitHash, taggedVersion string) (string, error) {
 	return fmt.Sprintf("%s-0.%s", taggedVersion, commitHash), nil
 }
 
-func goChecksum(repoPath, mod, version string) (string, error) {
-	tmpfile, err := ioutil.TempFile("", "modfile-zip")
+func GoModChecksum(repopath, mod string) {
+	hash, err := dirhash.Hash1([]string{filepath.Join(repopath, mod, "go.mod")}, func(name string) (io.ReadCloser, error) {
+		return os.Open(name)
+	})
 	if err != nil {
-		return "", err
+		fmt.Println(err)
 	}
 
-	defer os.Remove(tmpfile.Name())
-
-	err = zip.CreateFromDir(tmpfile, module.Version{
-		Path:    lengthenModPath(mod),
-		Version: version,
-	}, filepath.Join(repoPath, mod))
-	if err != nil {
-		return "", err
-	}
-
-	return dirhash.HashZip(tmpfile.Name(), dirhash.DefaultHash)
+	fmt.Println(hash)
 }

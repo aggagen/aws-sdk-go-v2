@@ -128,7 +128,7 @@ type changeTemplate struct {
 	Modules         []string
 	Type            ChangeType
 	Description     string
-	AffectedModules []string `yaml:"affected_modules"`
+	AffectedModules []string `yaml:"affected_modules,omitempty"`
 }
 
 // Change represents a change to a single Go module.

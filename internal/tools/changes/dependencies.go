@@ -49,7 +49,7 @@ func (graph ModuleGraph) dependencyUpdates(updatedModules []string) map[string][
 			updates[d] = append(updates[d], m)
 
 			if _, ok := seen[d]; !ok {
-				// add the dependency module to the recursive search if we haven't already encountered it.
+				// add the dependency module to the search if we haven't already encountered it.
 				updatedModules = append(updatedModules, d)
 			}
 		}
